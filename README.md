@@ -29,7 +29,7 @@ google-adk-agents/
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/your-username/google-adk-agents.git
+   git clone https://github.com/onlyarnav/google-adk-agents.git
    cd google-adk-agents
    ```
 
