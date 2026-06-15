@@ -5,15 +5,18 @@ A professional collection of automation agents built using the Google API Python
 ## 🚀 Features
 
 - **Gmail Automation**: Send, read, search, and manage emails programmatically.
+- **Advanced Emailing**: Support for CC, BCC, multiple recipients, HTML bodies (links), and file attachments.
 - **Email Summarization**: Integrated logic for summarizing long email threads (placeholder ready for LLM integration).
-- **Modular Architecture**: Clean separation between the agent logic, documentation, and configuration.
+- **Agent Hub Architecture**: Centralized management for all agents, making it easy to scale the project with new Google service agents.
 
 ## 📁 Project Structure
 
 ```text
 google-adk-agents/
 ├── src/
+│   ├── hub.py               # Central Agent Hub for accessing all agents
 │   └── agents/
+│       ├── __init__.py
 │       └── gmail_agent.py   # Core Gmail Agent implementation
 ├── docs/
 │   └── connecting_gmail.md # Detailed setup guide for Google Cloud Console
@@ -52,19 +55,33 @@ Please follow the detailed step-by-step guide in [docs/connecting_gmail.md](docs
 
 ## 💻 Usage Example
 
+You can use the `AgentHub` to manage all your agents from a single place.
+
 ```python
-from src.agents.gmail_agent import GmailAgent
+from src.hub import AgentHub
 
-agent = GmailAgent()
+# Initialize the Hub
+hub = AgentHub()
 
-# Send an email
-agent.send_email("someone@example.com", "Hello from Agent", "This is a test body")
+# Get the Gmail Agent
+gmail = hub.get_agent('gmail')
+
+# Send a professional email with CC, BCC, and Attachments
+gmail.send_email(
+    to=["recipient1@example.com", "recipient2@example.com"],
+    subject="Quarterly Report",
+    body="<h1 style='color:blue;'>Hello Team</h1><p>Please find the report attached and check the <a href='https://google.com'>link</a>.</p>",
+    cc="manager@example.com",
+    bcc="archive@example.com",
+    attachments=["report.pdf"],
+    is_html=True
+)
 
 # Read and summarize latest emails
-emails = agent.read_latest_emails(max_results=5)
+emails = gmail.read_latest_emails(max_results=5)
 for email in emails:
     print(f"From: {email['from']}")
-    print(f"Summary: {agent.summarize_email(email['body'])}")
+    print(f"Summary: {gmail.summarize_email(email['body'])}")
 ```
 
 ## 🛡️ Security Note
