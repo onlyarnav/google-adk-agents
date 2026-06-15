@@ -1,6 +1,9 @@
 import os
 import base64
 from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.mime.base import MIMEBase
+from email import encoders
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -10,16 +13,18 @@ from googleapiclient.discovery import build
 SCOPES = ['https://www.googleapis.com/auth/gmail.modify']
 
 class GmailAgent:
+    """
+    Professional Gmail Agent for automating email communication.
+    Supports advanced features like CC, BCC, attachments, and HTML content.
+    """
     def __init__(self):
         self.service = self._authenticate()
 
     def _authenticate(self):
         creds = None
-        # The file token.json stores the user's access and refresh tokens
         if os.path.exists('token.json'):
             creds = Credentials.from_authorized_user_file('token.json', SCOPES)
 
-        # If there are no (valid) credentials available, let the user log in.
         if not creds or not creds.valid:
             if creds and creds.expired and creds.refresh_token:
                 creds.refresh(Request())
@@ -27,17 +32,54 @@ class GmailAgent:
                 flow = InstalledAppFlow.from_client_secrets_file(
                     'credentials.json', SCOPES)
                 creds = flow.run_local_server(port=0)
-            # Save the credentials for the next run
             with open('token.json', 'w') as token:
                 token.write(creds.to_json())
 
         return build('gmail', 'v1', credentials=creds)
 
-    def send_email(self, to, subject, body):
-        """Sends an email using the Gmail API."""
-        message = MIMEText(body)
-        message['to'] = to
-        message['subject'] = subject
+    def send_email(self, to, subject, body, cc=None, bcc=None, attachments=None, is_html=False):
+        """
+        Sends a professional email.
+
+        Args:
+            to (list|str): Main recipient(s).
+            subject (str): Email subject.
+            body (str): Email content.
+            cc (list|str, optional): CC recipients.
+            bcc (list|str, optional): BCC recipients.
+            attachments (list, optional): List of file paths to attach.
+            is_html (bool): If True, renders body as HTML (allows links).
+        """
+        def format_recipients(recipients):
+            if isinstance(recipients, list):
+                return ", ".join(recipients)
+            return recipients
+
+        to_str = format_recipients(to)
+        cc_str = format_recipients(cc) if cc else ""
+        bcc_str = format_recipients(bcc) if bcc else ""
+
+        message = MIMEMultipart()
+        message['To'] = to_str
+        message['Cc'] = cc_str
+        message['Bcc'] = bcc_str
+        message['Subject'] = subject
+
+        mime_type = 'html' if is_html else 'plain'
+        message.attach(MIMEText(body, mime_type))
+
+        if attachments:
+            for filepath in attachments:
+                try:
+                    with open(filepath, "rb") as attachment_file:
+                        part = MIMEBase("application", "octet-stream")
+                        part.set_payload(attachment_file.read())
+                        encoders.encode_base64(part)
+                        part['Content-Disposition'] = f"attachment; filename={os.path.basename(filepath)}"
+                        message.attach(part)
+                except Exception as e:
+                    print(f"Failed to attach file {filepath}: {e}")
+
         raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
 
         try:
@@ -49,7 +91,7 @@ class GmailAgent:
             return None
 
     def read_latest_emails(self, max_results=5):
-        """Reads the latest emails from the inbox."""
+        """Reads the latest emails from the inbox with robust parsing."""
         try:
             results = self.service.users().messages().list(userId='me', maxResults=max_results).execute()
             messages = results.get('messages', [])
@@ -64,7 +106,6 @@ class GmailAgent:
                     subject = next((h['value'] for h in headers if h['name'] == 'Subject'), "No Subject")
                     sender = next((h['value'] for h in headers if h['name'] == 'From'), "Unknown Sender")
 
-                    # Simplified body extraction
                     body = ""
                     if 'parts' in payload:
                         for part in payload['parts']:
@@ -77,7 +118,7 @@ class GmailAgent:
                         if data:
                             body = base64.urlsafe_b64decode(data).decode()
 
-                    emails.append({'from': sender, 'subject': subject, 'body': body})
+                    emails.append({'id': msg['id'], 'from': sender, 'subject': subject, 'body': body})
                 except Exception as inner_e:
                     print(f"Error reading individual message {msg['id']}: {inner_e}")
                     continue
@@ -88,20 +129,13 @@ class GmailAgent:
             return []
 
     def summarize_email(self, email_content):
-        """
-        Summarizes email content.
-        Note: This is a placeholder for an LLM integration (e.g., OpenAI, Claude, or Gemini).
-        """
+        """Summarizes email content (Placeholder for LLM integration)."""
         if not email_content:
             return "No content to summarize."
-
-        # In a real scenario, you would call an LLM API here.
-        # Example: response = llm.complete(f"Summarize this email: {email_content}")
-        summary = f"[Summary Placeholder]: The email is {len(email_content)} characters long and discusses the provided content."
-        return summary
+        return f"[Summary Placeholder]: The email is {len(email_content)} characters long."
 
     def mark_as_read(self, message_id):
-        """Marks a specific email as read (removes UNREAD label)."""
+        """Marks a specific email as read."""
         try:
             self.service.users().messages().batchModify(
                 userId='me',
@@ -109,7 +143,7 @@ class GmailAgent:
             ).execute()
             print(f"Message {message_id} marked as read.")
         except Exception as e:
-            print(f"An error occurred: {e}")
+            print(f"Error in mark_as_read: {e}")
 
     def search_emails(self, query):
         """Search for emails based on a query."""
@@ -117,15 +151,11 @@ class GmailAgent:
             results = self.service.users().messages().list(userId='me', q=query).execute()
             return results.get('messages', [])
         except Exception as e:
-            print(f"An error occurred: {e}")
+            print(f"Error in search_emails: {e}")
             return []
 
 if __name__ == "__main__":
-    # Example usage (Commented out as per request 'dont run it')
+    # Professional testing block
     agent = GmailAgent()
-    agent.send_email("recipient@example.com", "Test Subject", "Test Body")
-    emails = agent.read_latest_emails()
-    for e in emails:
-        print(f"From: {e['from']} | Subject: {e['subject']}")
-        print(f"Summary: {agent.summarize_email(e['body'])}\n")
+    # Example: send_email(to=["a@b.com"], subject="Test", body="Hello", is_html=True)
     pass
